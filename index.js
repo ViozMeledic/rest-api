@@ -1,32 +1,36 @@
 require('dotenv').config()
 const express = require('express')
-const { MongoClient, ObjectId } = require('mongodb')
-const bodyParser = require('body-parser')
+const mongoose = require('mongoose')
 const logger = require('morgan')
+const User = require('./models/User')
 
-let collection
 const app = express()
-app.use(bodyParser.json())
-app.use(bodyParser.urlencoded({ extended: true }))
+const port = process.env.PORT || 3000
+const spaces = '    '
+
+app.use(express.json())
+app.use(express.urlencoded())
 app.use(logger('dev'))
 
 app.get('/', function (req, res, next) {
-    res.send('Please try again with "/users"')
+    res.json('Please try again with "/users"')
 })
 
 app.get('/users', async function (req, res, next) {
     try {
-        const result = await collection.find({}, { limit: 10, sort: { _id: -1 } }).toArray()
-        res.send(result)
-    } catch (error) {
-        next(error)
-    }
-})
-
-app.post('/users', async function (req, res, next) {
-    try {
-        const result = await collection.insertOne(req.body, {})
-        res.send(result)
+        const pageNo = Number.parseInt(req.query.page) || 1
+        const pageSize = Number.parseInt(req.query.size) || 2
+        const sortField = req.query.orderBy || '_id'
+        const result = await User
+            .find()
+            .skip((pageNo - 1) * pageSize)
+            .limit(pageSize)
+            .sort({ [sortField]: 1 })
+        res.status(200).json({
+            code: 'ok',
+            message: 'User(s) found',
+            users: result,
+        })
     } catch (error) {
         next(error)
     }
@@ -34,8 +38,37 @@ app.post('/users', async function (req, res, next) {
 
 app.get('/users/:id', async function (req, res, next) {
     try {
-        const result = await collection.findOne({ _id: new ObjectId(req.params.id) })
-        res.send(result)
+        const result = await User.findById(req.params.id);
+        if (!result) {
+            res.status(404).json({
+                code: 'notFound',
+                message: 'User is not found',
+            })
+        }
+        res.status(200).json({
+            code: 'ok',
+            message: 'User is found',
+            user: result
+        })
+    } catch (error) {
+        next(error)
+    }
+})
+
+app.post('/users', async function (req, res, next) {
+    try {
+        const user = new User({
+            name: req.body.name,
+            email: req.body.email,
+            createdDate: Date.now(),
+            lastModified: Date.now(),
+        })
+        const result = await user.save();
+        res.status(201).json({
+            code: 'created',
+            message: 'User is created successfully',
+            id: result._id,
+        })
     } catch (error) {
         next(error)
     }
@@ -43,10 +76,32 @@ app.get('/users/:id', async function (req, res, next) {
 
 app.put('/users/:id', async function (req, res, next) {
     try {
-        const result = await collection.updateOne(
-            { _id: new ObjectId(req.params.id) },
-            { $set: req.body })
-        res.send((result.modifiedCount === 1) ? { msg: 'success' } : { msg: 'error' })
+        let user = await User.findById(req.params.id)
+        let statusCode = 200
+
+        if (!user) {
+            user = new User({ _id: req.params.id, createdDate: Date.now(), })
+            statusCode = 201
+        }
+
+        user.name = req.body.name || user.name
+        user.email = req.body.email || user.email
+        user.lastModified = Date.now()
+
+        const result = await user.save();
+        if (statusCode === 201) {
+            res.status(statusCode).json({
+                code: 'created',
+                message: 'User is created successfully',
+                id: result._id,
+            })
+        }
+
+        res.status(statusCode).json({
+            code: 'ok',
+            message: 'User is updated successfully',
+            user: result,
+        })
     } catch (error) {
         next(error)
     }
@@ -54,16 +109,32 @@ app.put('/users/:id', async function (req, res, next) {
 
 app.delete('/users/:id', async function (req, res, next) {
     try {
-        const result = await collection.deleteOne({ _id: new ObjectId(req.params.id) })
-        res.send((result.deletedCount === 1) ? { msg: 'success' } : { msg: 'error' })
+        let result = await User.findById(req.params.id)
+        if (!result) {
+            res.status(404).json({
+                code: 'notFound',
+                message: 'User is not found',
+            })
+        }
+
+        result = await User.deleteOne({ _id: req.params.id })
+        if (result.deletedCount > 0) {
+            res.status(204).json({
+                code: 'noContent',
+                message: 'User is deleted successfully',
+            })
+        } else {
+            res.status(500).json({
+                code: 'internalServerError',
+                message: 'Something bad happened'
+            })
+        }
     } catch (error) {
         next(error)
     }
 })
 
-app.listen(3000, async function () {
-    const client = new MongoClient(process.env.CONNECTION_STRING)
-    await client.connect()
-    collection = client.db("production").collection("users")
-    console.log('Express server is listening on port 3000.')
+app.listen(port, async function () {
+    await mongoose.connect(process.env.CONNECTION_STRING)
+    console.log(`Express server is listening on port ${port}.`)
 })
