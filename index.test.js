@@ -26,7 +26,8 @@ describe('express rest api server', function () {
                 expect(e).to.eql(null)
                 expect(res.statusCode).to.eql(200)
                 expect(typeof res.body).to.eql('object')
-                expect(res.body.user._id).to.eql(id)
+                expect(res.body.users).to.length(1)
+                expect(res.body.users[0]._id).to.eql(id)
                 done()
             })
     })
@@ -37,6 +38,7 @@ describe('express rest api server', function () {
                 expect(e).to.eql(null)
                 expect(res.body.code).to.eql('ok')
                 expect(JSON.stringify(res.body).length).to.be.above(0)
+                expect(res.body.users.length).to.be.above(0)
                 done()
             })
     })
@@ -59,15 +61,16 @@ describe('express rest api server', function () {
                 expect(e).to.eql(null)
                 expect(res.statusCode).to.eql(200)
                 expect(typeof res.body).to.eql('object')
-                expect(res.body.user.name).to.eql('test2')
-                expect(res.body.user.email).to.eql('test2@email.com')
-                expect(res.body.user.lastModified).to.above(res.body.user.createdDate)
+                expect(res.body.users).to.length(1)
+                expect(res.body.users[0].name).to.eql('test2')
+                expect(res.body.users[0].email).to.eql('test2@email.com')
+                expect(res.body.users[0].lastModified).to.above(res.body.users[0].createdDate)
                 done()
             })
     })
 
     it('updates an non-existing object', function (done) {
-        const newId = '6838739f1c8eb5b33c3ed1ff'
+        const newId = '6838653155e0939e5bf2005e'
         superagent.put('http://localhost:3000/users/' + newId)
             .send({ _id: newId, name: 'test2', email: 'test2@email.com' })
             .end(function (e, res) {

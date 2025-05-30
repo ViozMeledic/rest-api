@@ -6,8 +6,6 @@ const User = require('./models/User')
 
 const app = express()
 const port = process.env.PORT || 3000
-const spaces = '    '
-
 app.use(express.json())
 app.use(express.urlencoded())
 app.use(logger('dev'))
@@ -48,7 +46,7 @@ app.get('/users/:id', async function (req, res, next) {
         res.status(200).json({
             code: 'ok',
             message: 'User is found',
-            user: result
+            users: [result]
         })
     } catch (error) {
         next(error)
@@ -100,7 +98,7 @@ app.put('/users/:id', async function (req, res, next) {
         res.status(statusCode).json({
             code: 'ok',
             message: 'User is updated successfully',
-            user: result,
+            users: [result],
         })
     } catch (error) {
         next(error)
